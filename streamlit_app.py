@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
 import plotly.graph_objs as go
-import requests
+import requests, pickle, joblib
 
 # Function to calculate moving averages
 def calculate_moving_average(data, window_size):
@@ -19,16 +19,22 @@ def create_dataset(data, look_back=100):
         X.append(data[i:(i + look_back)])
     return np.array(X)
 
-# Function to download model file
-def download_model(model_url, model_filename):
-    response = requests.get(model_url)
-    with open(model_filename, 'wb') as f:
-        f.write(response.content)
+# @st.cache(allow_output_mutation=True)
+def load_model(path):
+    with open(path, 'rb') as file:
+        model = pickle.load(file)
+    return model
+
+# # Function to download model file
+# def download_model(model_url, model_filename):
+#     response = requests.get(model_url)
+#     with open(model_filename, 'wb') as f:
+#         f.write(response.content)
 
 # Streamlit app
 def main():
     st.sidebar.title('Stock Price Forecasting App')
-    st.sidebar.markdown('Copyright by Rajdeep Sarkar')
+    st.sidebar.markdown('Copyright by Casey Alexander')
 
     # User input for stock ticker symbol
     stock_symbol = st.sidebar.text_input('Enter Stock Ticker Symbol (e.g., MSFT):')
@@ -38,13 +44,17 @@ def main():
     end_date = st.sidebar.date_input('Select End Date:', datetime.now())
 
     # Model selection
-    selected_model = st.sidebar.radio("Select Model", ("Neural Network", "Random Forest"))
+    selected_model = st.sidebar.radio("Select Model", ("Neural Network", "Random Forest", "Linear Regression"))
 
     # Load stock data
     if stock_symbol:
         try:
             stock_data = yf.download(stock_symbol, start=start_date, end=end_date)
             st.subheader('Stock Data')
+    
+            # print(f"\nstock_data={stock_data.shape}\n")
+            # print(stock_data.head(3)+ '\n')
+    
             st.write(stock_data.head(50))  # Display first 50 rows
             st.write("...")  # Inserting an ellipsis for large datasets
 
@@ -88,30 +98,43 @@ def main():
 
             # Load trained model based on selection
             if selected_model == "Neural Network":
-                model_url = "https://github.com/rajdeepUWE/stock_market_forecast/raw/master/KNN_model.h5"
-                model_filename = "KNN_model.h5"
+                # model_url = "https://github.com/rajdeepUWE/stock_market_forecast/raw/master/KNN_model.h5"
+                model_filename = "KNN_model.keras"
+                # model_filename = "KNN_model.keras"                
             elif selected_model == "Random Forest":
-                model_url = "https://github.com/rajdeepUWE/stock_market_forecast/raw/master/random_forest_model.h5"
-                model_filename = "random_forest_model.h5"
+                # model_url = "https://github.com/rajdeepUWE/stock_market_forecast/raw/master/random_forest_model.h5"
+                model_filename = "random_forest_model.keras"
+            elif selected_model == "Linear Regression":
+                # model_url = "https://github.com/rajdeepUWE/stock_market_forecast/raw/master/random_forest_model.h5"
+                model_filename = "linear_regression_model.keras"
+                #model_filename = "./testing/linear_regression_model.pkl"                
 
             # Download model file
-            download_model(model_url, model_filename)
+            # download_model(model_url, model_filename)
 
             # Load model
-            model = load_model(model_filename)
+            # model = load_model(model_filename)
+            # model = load_model('./testing/grid_search_lr_model.pkl')
+            model = joblib.load('./testing/grid_search_lr_model.pkl')
+            best_model = model.best_estimator_            
 
             # Compile the model with appropriate optimizer and loss function
-            model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mae'])
+            # model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mae'])
 
             # Scale data
             scaler = MinMaxScaler(feature_range=(0, 1))
             scaled_data = scaler.fit_transform(np.array(stock_data['Close']).reshape(-1, 1))
-
+            print(f"scaled_data dims => {scaled_data.shape}\n")
+            # print(scaled_data)
+            
             # Prepare data for prediction
             x_pred = create_dataset(scaled_data)
+            print(f"x_pred dims => {x_pred.shape}\n")
+            print(f"x_pred => {x_pred}\n")
 
             # Predict stock prices
-            y_pred = model.predict(x_pred)
+            # y_pred = model.predict(x_pred)
+            y_pred = best_model.predict(x_pred)
             y_pred = scaler.inverse_transform(y_pred)
 
             # Plot original vs predicted prices
@@ -127,10 +150,12 @@ def main():
 
             # Use the last 100 days of data for forecasting
             last_100_days = stock_data['Close'].tail(100)
+            # print(f"(before transform) last_100_days={last_100_days.shape}\n")
             last_100_days_scaled = scaler.transform(np.array(last_100_days).reshape(-1, 1))
+            # print(f"last_100_days_scaled={last_100_days_scaled.shape}\n")
 
             for i in range(30):
-                x_forecast = last_100_days_scaled[-100:].reshape(1, -1)
+                x_forecast = last_100_days_scaled[-100:].reshape(1, -1, 1)
                 y_forecast = model.predict(x_forecast)
                 forecast.iloc[i] = scaler.inverse_transform(y_forecast)[0][0]
                 last_100_days_scaled = np.append(last_100_days_scaled, y_forecast)

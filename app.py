@@ -36,6 +36,7 @@ def forecast_next_7_days_keras(data):
 def forecast_next_7_days_linear_regression(data):
     try:
         linear_regression_model = joblib.load('linear_regression_model.h5')  # Load Linear Regression model for forecasting
+        # linear_regression_model = joblib.load('linear_regression_model.keras')  # Load Linear Regression model for forecasting
         return linear_regression_model.predict(data[-7:].values.reshape(1, -1))
     except Exception as e:
         st.error(f"Error in forecasting using Linear Regression model: {str(e)}")
