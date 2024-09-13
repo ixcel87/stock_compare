@@ -45,8 +45,8 @@ def main():
     end_date = st.sidebar.date_input('Select End Date:', datetime.now())
 
     # Model selection
-    # selected_model = st.sidebar.radio("Select Model", ("LSTM"))
-    selected_model = st.sidebar.radio("Select Model", ("Linear Regression", "Linear Regression w/ Neural Network", "Random Forest", "LSTM" ))
+    selected_model = st.sidebar.radio("Select Model", ("LSTM"))
+    # selected_model = st.sidebar.radio("Select Model", ("Linear Regression", "Linear Regression w/ Neural Network", "Random Forest", "LSTM" ))
 
     # Load stock data
     if stock_symbol:
