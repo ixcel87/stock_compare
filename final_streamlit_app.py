@@ -26,11 +26,6 @@ def load_model(path):
         model = pickle.load(file)
     return model
 
-# # Function to download model file
-# def download_model(model_url, model_filename):
-#     response = requests.get(model_url)
-#     with open(model_filename, 'wb') as f:
-#         f.write(response.content)
 
 # Streamlit app
 def main():
@@ -111,70 +106,99 @@ def main():
             elif selected_model == "LSTM":
                 model_filename = "./working/pickledModels/tfLSTM_model.dill"              
 
-            # Download model file
-            # download_model(model_url, model_filename)
-
             # Load model
             model = joblib.load(model_filename)
             best_model = model.best_estimator_            
 
-            # Compile the model with appropriate optimizer and loss function
-            # model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mae'])
-
             # Scale data
             scaler = MinMaxScaler(feature_range=(0, 1))
             scaled_data = scaler.fit_transform(np.array(stock_data['Close']).reshape(-1, 1))
-            # print(f"scaled_data dims => {scaled_data.shape}\n")
-            # print(scaled_data)
             
             # Prepare data for prediction - CREATE DATASET!!
             x_pred = create_dataset(scaled_data)
-            # print(f"x_pred dims => {x_pred.shape}\n")
-            # print(f"x_pred => {x_pred}\n")
 
-            # reduces the (151, 100, 1) dimensional array to (151, 100) dimensional array
-            # needed for regular scikit learn models - LinearRegression, etc...            
-            # print(f"x_pred SQUEEZED dims => {np.squeeze(x_pred).shape}\n")
-            # print(f"x_pred SQUEEZED => {np.squeeze(x_pred)}\n")
+            # The below model files require a 2D input array (Linear Regression, Linear Regression w/ Neural Network, Random Forest)
+            if model_filename == "./working/pickledModels/lrTensorFlow.dill" or model_filename == "./working/pickledModels/grid_search_rfr_model.pkl" or model_filename == "./working/pickledModels/grid_search_lr_model.pkl":
 
-            # Predict stock prices
-            # y_pred = model.predict(x_pred)
-            # y_pred = best_model.predict(x_pred)
-            x_pred = np.squeeze(x_pred)
-            y_pred = best_model.predict(x_pred)
-            # print(f"y_pred BEFORE INVERSE TRANSFORM{y_pred.shape} => {y_pred}\n")
-            y_pred = scaler.inverse_transform(y_pred.reshape(-1, 1))
-            # print(f"y_pred AFTER INVERSE TRANSFORM{y_pred.shape} => {y_pred}\n")
+                # reduces the (151, 100, 1) dimensional array to (151, 100) dimensional array
+                # needed for regular scikit learn models - LinearRegression, etc...                
+                x_pred = np.squeeze(x_pred)
 
-            # Plot original vs predicted prices
-            st.subheader('Original vs Predicted Prices')
-            fig3 = go.Figure()
-            fig3.add_trace(go.Scatter(x=stock_data.index, y=stock_data['Close'], mode='lines', name='Original Price'))
-            fig3.add_trace(go.Scatter(x=stock_data.index[100:], y=y_pred.flatten(), mode='lines', name='Predicted Price'))
-            st.plotly_chart(fig3)
+                # Predict stock prices
+                y_pred = best_model.predict(x_pred)
+                y_pred = scaler.inverse_transform(y_pred.reshape(-1, 1))
 
-            # Forecasting
-            forecast_dates = [stock_data.index[-1] + timedelta(days=i) for i in range(1, 31)]
-            forecast = pd.DataFrame(index=forecast_dates, columns=['Forecast'])
+                # Plot original vs predicted prices
+                st.subheader('Original vs Predicted Prices')
+                fig3 = go.Figure()
+                fig3.add_trace(go.Scatter(x=stock_data.index, y=stock_data['Close'], mode='lines', name='Original Price'))
+                fig3.add_trace(go.Scatter(x=stock_data.index[100:], y=y_pred.flatten(), mode='lines', name='Predicted Price'))
+                st.plotly_chart(fig3)
 
-            # Use the last 100 days of data for forecasting
-            last_100_days = stock_data['Close'].tail(100)
-            # print(f"(before transform) last_100_days={last_100_days.shape}\n")
-            last_100_days_scaled = scaler.transform(np.array(last_100_days).reshape(-1, 1))
-            # print(f"last_100_days_scaled={last_100_days_scaled.shape}\n")
+                # Forecasting
+                forecast_dates = [stock_data.index[-1] + timedelta(days=i) for i in range(1, 31)]
+                forecast = pd.DataFrame(index=forecast_dates, columns=['Forecast'])
 
-            for i in range(30):
-                # x_forecast = last_100_days_scaled[-100:].reshape(1, -1, 1)
-                x_forecast = last_100_days_scaled[-100:].reshape(1, -1)
-                # print(f"x_forecast {x_forecast.shape} => {x_forecast}\n")
+                # Use the last 100 days of data for forecasting
+                last_100_days = stock_data['Close'].tail(100)
+                last_100_days_scaled = scaler.transform(np.array(last_100_days).reshape(-1, 1))
 
-                y_forecast = best_model.predict(x_forecast)
-                # forecast.iloc[i] = scaler.inverse_transform(y_forecast)[0][0]
-                forecast.iloc[i] = scaler.inverse_transform(y_forecast.reshape(-1, 1))[0][0]
-                last_100_days_scaled = np.append(last_100_days_scaled, y_forecast)
+                for i in range(30):
+                    x_forecast = last_100_days_scaled[-100:].reshape(1, -1)
 
-            st.subheader('30-Day Forecast')
-            st.write(forecast)
+                    y_forecast = best_model.predict(x_forecast)
+                    forecast.iloc[i] = scaler.inverse_transform(y_forecast.reshape(-1, 1))[0][0]
+                    last_100_days_scaled = np.append(last_100_days_scaled, y_forecast)
+
+                st.subheader('30-Day Forecast')
+                st.write(forecast)
+
+            else: # All other models require 3D shape
+
+                # For LSTM need to make this 151, 1, 100
+                # 3D array (151 samples, 1 timestep (treat each sample as if it's a single point in time), 100 features)
+                x_pred = x_pred.reshape((x_pred.shape[0], 1, x_pred.shape[1]))
+
+                # returns a 1D array containing scaled predicted prices
+                y_pred = best_model.predict(x_pred)
+
+                # inverse_transform and transform need a 2D array => get non-scaled predicted pricing
+                y_pred = scaler.inverse_transform(y_pred.reshape(-1, 1))
+
+                # Plot original vs predicted prices
+                st.subheader('Original vs Predicted Prices')
+                fig3 = go.Figure()
+                fig3.add_trace(go.Scatter(x=stock_data.index, y=stock_data['Close'], mode='lines', name='Original Price'))
+                fig3.add_trace(go.Scatter(x=stock_data.index[100:], y=y_pred.flatten(), mode='lines', name='Predicted Price'))
+                st.plotly_chart(fig3)
+
+                # Forecasting => get the next 30 days into a DF with (index=forecast_dates, columns=['Forecast'])
+                forecast_dates = [stock_data.index[-1] + timedelta(days=i) for i in range(1, 31)]
+                forecast = pd.DataFrame(index=forecast_dates, columns=['Forecast'])
+
+                # Use the last 100 days of data for forecasting
+                last_100_days = stock_data['Close'].tail(100)
+                last_100_days_scaled = scaler.transform(np.array(last_100_days).reshape(-1, 1))
+
+                for i in range(30):                
+                    # This line takes the last 100 scaled values and reshapes it into a 3D array (1 sample, 1 timestep, -1(implies to leave this value as is))
+                    # This results in a (1, 1, 100) array
+                    x_forecast = last_100_days_scaled[-100:].reshape(1, 1, -1)
+                    
+                    # Take the newly created 3D array and run it thru the LSTM model as it requires a 3D array
+                    # the resulting array is a (1,) array which is a 1D array containing the predicted price
+                    y_forecast = best_model.predict(x_forecast)
+                    
+                    # We need to reshape the 1D (1,) price array into a 2D (1, 1) cuz transform and inverse_transform needs a 2D array
+                    # Next we assign that value to the i-th element in the forecast DataFrame
+                    # The [0][0] extracts the single value from the 2D array
+                    forecast.iloc[i] = scaler.inverse_transform(y_forecast.reshape(-1, 1))[0][0]
+                    
+                    # Just adding it to the last_100_days_scaled array
+                    last_100_days_scaled = np.append(last_100_days_scaled, y_forecast)
+
+                st.subheader('30-Day Forecast')
+                st.write(forecast)                
 
         except Exception as e:
             st.error(f"Error: {e}")
