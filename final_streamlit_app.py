@@ -97,14 +97,18 @@ def main():
             if selected_model == "Linear Regression w/ Neural Network":
                 model_filename = "./working/pickledModels/lrTensorFlow.dill"   
                 # model = joblib.load(model_filename)
+                twoD = 1
             elif selected_model == "Random Forest":
                 model_filename = "./working/pickledModels/grid_search_rfr_model.pkl" 
-                # model = dill.load(model_filename)                
+                # model = dill.load(model_filename)  
+                twoD = 1              
             elif selected_model == "Linear Regression":
                 model_filename = "./working/pickledModels/grid_search_lr_model.pkl" 
-                # model = dill.load(model_filename)   
+                # model = dill.load(model_filename)
+                twoD = 1   
             elif selected_model == "LSTM":
-                model_filename = "./working/pickledModels/tfLSTM_model.dill"              
+                model_filename = "./working/pickledModels/tfLSTM_model.dill" 
+                twoD = 0             
 
             # Load model
             model = joblib.load(model_filename)
@@ -118,7 +122,8 @@ def main():
             x_pred = create_dataset(scaled_data)
 
             # The below model files require a 2D input array (Linear Regression, Linear Regression w/ Neural Network, Random Forest)
-            if model_filename == "./working/pickledModels/lrTensorFlow.dill" or model_filename == "./working/pickledModels/grid_search_rfr_model.pkl" or model_filename == "./working/pickledModels/grid_search_lr_model.pkl":
+            # FIND A BETTER WAY TO DO THIS!!
+            if twoD == 1:
 
                 # reduces the (151, 100, 1) dimensional array to (151, 100) dimensional array
                 # needed for regular scikit learn models - LinearRegression, etc...                
