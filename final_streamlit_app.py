@@ -5,7 +5,6 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 from sklearn.preprocessing import MinMaxScaler
-# from tensorflow.keras.models import load_model
 import plotly.graph_objs as go
 import requests, pickle, joblib, dill
 
